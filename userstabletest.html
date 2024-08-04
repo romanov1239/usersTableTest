@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+    <title>Список пользователей</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <style type="text/css">
+        body {
+            background-color: #ffffff;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .header {
+            margin-bottom: 10px;
+        }
+        .ft10 {
+            font-size: 20px;
+            font-weight: bold;
+            color: #000000;
+            text-align: left;
+        }
+        .search-box {
+            width: 80%;
+            font-size: 16px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .button-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .button-group p {
+            margin: 0;
+            margin-right: 10px;
+        }
+        .sort-button, .clear-button {
+            background-color: #FFFFFF;
+            border: 1px solid #000000;
+            color: #000000;
+            cursor: pointer;
+            font-size: 13px;
+            padding: 5px 10px;
+            margin-right: 10px;
+            border-radius: 4px;
+        }
+        .clear-button {
+            margin-bottom: 30px;
+        }
+        .sort-button:hover, .clear-button:hover {
+            background-color: #e0e0e0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #ffffff;
+            box-shadow: 0px 0px 5px rgba(0,0,0,0.1);
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .username-cell {
+            color: #09b8ed;
+            font-weight: bold;
+        }
+        .pagination {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+        .pagination-button {
+            background-color: #FFFFFF;
+            border: 1px solid #000000;
+            color: #000000;
+            cursor: pointer;
+            font-size: 13px;
+            padding: 5px 10px;
+            margin: 0 5px;
+            border-radius: 4px;
+        }
+        .pagination-button:hover {
+            background-color: #e0e0e0;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .modal-button {
+            background-color: #FFFFFF;
+            border: 1px solid #000000;
+            color: #000000;
+            cursor: pointer;
+            font-size: 13px;
+            padding: 5px 10px;
+            margin: 10px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <p class="ft10">Список пользователей</p>
+    </div>
+    <input type="text" class="search-box" placeholder="Поиск по имени или e-mail">
+    <button class="clear-button" onclick="clearFilter()">Очистить фильтр</button>
+    <div class="button-group">
+        <p>Сортировка:</p>
+        <button class="sort-button" onclick="sortTable(2)">Дата регистрации</button>
+        <button class="sort-button" onclick="sortTable(3)">Рейтинг</button>
+    </div>
+    <table id="userTable">
+        <thead>
+        <tr>
+            <th>Имя пользователя</th>
+            <th>E-mail</th>
+            <th>Дата регистрации</th>
+            <th>Рейтинг</th>
+            <th>Удалить</th>
+        </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+    <div class="pagination">
+    </div>
+
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <p>Вы уверены, что хотите удалить пользователя <span id="modal-username"></span>?</p>
+            <button id="confirmDelete" class="modal-button">Да</button>
+            <button id="cancelDelete" class="modal-button">Нет</button>
+        </div>
+    </div>
+
+    <script>
+        "use strict";
+        let currentPage = 1;
+        const rowsPerPage = 5;
+        let usersData = [];
+        let filteredData = [];
+        let userToDelete = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchUsers();
+
+            document.querySelector('#modal').style.display = 'none';
+
+            document.querySelector('.search-box').addEventListener('keyup', filterTable, false);
+            document.querySelector('#cancelDelete').addEventListener('click', closeModal, false);
+            document.querySelector('#confirmDelete').addEventListener('click', confirmDelete, false);
+            document.querySelector('.close').addEventListener('click', closeModal, false);
+        });
+
+        function fetchUsers() {
+            fetch('https://5ebbb8e5f2cfeb001697d05c.mockapi.io/users')
+                .then(response => response.json())
+                .then(data => {
+                    usersData = data;
+                    filteredData = data;
+                    displayPage(currentPage);
+                })
+                .catch(error => {
+                    console.error('Ошибка при получении данных:', error);
+                });
+        }
+
+        function displayPage(page) {
+            const tbody = document.querySelector('#userTable tbody');
+            tbody.innerHTML = '';
+
+            const start = (page - 1) * rowsPerPage;
+            const end = start + rowsPerPage;
+            const paginatedUsers = filteredData.slice(start, end);
+
+            paginatedUsers.forEach(user => {
+                const tr = document.createElement('tr');
+                const registrationDate = user.registration_date ? new Date(user.registration_date).toLocaleDateString() : 'Дата не указана';
+                const rating = user.rating !== undefined ? user.rating : 'Рейтинг не указан';
+
+                tr.innerHTML = `
+                    <td class="username-cell">${user.username}</td>
+                    <td>${user.email}</td>
+                    <td>${registrationDate}</td>
+                    <td>${rating}</td>
+                    <td><button class="delete-button" onclick="showModal('${user.username}')">✖</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            setupPagination(filteredData);
+        }
+
+        function setupPagination(usersData) {
+            const pagination = document.querySelector('.pagination');
+            pagination.innerHTML = '';
+
+            const pageCount = Math.ceil(usersData.length / rowsPerPage);
+            for (let i = 1; i <= pageCount; i++) {
+                const button = document.createElement('button');
+                button.classList.add('pagination-button');
+                button.textContent = i;
+                button.addEventListener('click', () => {
+                    currentPage = i;
+                    displayPage(currentPage);
+                });
+                pagination.appendChild(button);
+            }
+        }
+
+        function sortTable(n) {
+            const compare = (a, b) => {
+                if (n === 2) {
+                    return new Date(a.registration_date) - new Date(b.registration_date);
+                } else if (n === 3) {
+                    return a.rating - b.rating;
+                }
+                return 0;
+            };
+
+            filteredData.sort(compare);
+            displayPage(currentPage);
+        }
+
+        function filterTable(event) {
+            const filter = event.target.value.toLowerCase();
+            filteredData = usersData.filter(user =>
+                user.username.toLowerCase().includes(filter) ||
+                user.email.toLowerCase().includes(filter)
+            );
+            displayPage(1);
+        }
+
+        function clearFilter() {
+            document.querySelector('.search-box').value = '';
+            filteredData = usersData;
+            displayPage(1);
+        }
+
+        function showModal(username) {
+            if (username) {
+                userToDelete = username;
+                document.querySelector('#modal-username').textContent = username;
+                document.querySelector('#modal').style.display = 'flex';
+            }
+        }
+
+        function closeModal() {
+            document.querySelector('#modal').style.display = 'none';
+            userToDelete = null;
+        }
+
+        function confirmDelete() {
+            if (userToDelete) {
+                usersData = usersData.filter(user => user.username !== userToDelete);
+                filteredData = filteredData.filter(user => user.username !== userToDelete);
+                displayPage(currentPage);
+                closeModal();
+            }
+        }
+    </script>
+</body>
+</html>
